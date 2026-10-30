@@ -1,0 +1,500 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Armador de PDF para imprimir</title>
+<style>
+:root{
+  box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);
+  --bg:#eef3f9;--card:#ffffff;--ink:#12263f;--muted:#5b6f88;--line:#d3dde9;
+  --accent:#1d4f91;--accent-ink:#ffffff;--soft:#e3edf8;--danger:#a63a3a;--sheet:#ffffff;--sheet-line:#b9c8da;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#0c1624;--card:#13233a;--ink:#e6eef8;--muted:#93a8c4;--line:#27405f;
+  --accent:#5b9bd9;--accent-ink:#08203a;--soft:#1b3452;--danger:#e08a8a;--sheet:#f4f7fb;--sheet-line:#6f87a6;}}
+:root[data-theme="dark"]{--bg:#0c1624;--card:#13233a;--ink:#e6eef8;--muted:#93a8c4;--line:#27405f;--accent:#5b9bd9;--accent-ink:#08203a;--soft:#1b3452;--danger:#e08a8a;--sheet:#f4f7fb;--sheet-line:#6f87a6}
+html{scroll-padding-top:env(safe-area-inset-top,0px);color-scheme:light dark}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
+.wrap{max-width:880px;margin:0 auto;padding:20px 16px 48px}
+header{margin-bottom:20px}
+h1{font-size:22px;margin:0 0 4px;letter-spacing:.2px}
+header p{margin:0;color:var(--muted)}
+.card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:18px;margin-bottom:16px}
+.step{display:flex;align-items:center;gap:10px;margin:0 0 12px;font-size:16px}
+.step b{display:inline-grid;place-items:center;width:26px;height:26px;border-radius:50%;background:var(--accent);color:var(--accent-ink);font-size:13px}
+.drop{border:2px dashed var(--line);border-radius:10px;padding:26px 12px;text-align:center;color:var(--muted);cursor:pointer;background:var(--soft);transition:border-color .15s}
+.drop.over{border-color:var(--accent)}
+.drop strong{color:var(--ink)}
+button{font:inherit;cursor:pointer;border-radius:8px;border:1px solid var(--line);background:var(--card);color:var(--ink);padding:7px 12px}
+button.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent);font-weight:600;padding:12px 20px;width:100%;font-size:16px}
+button:disabled{opacity:.5;cursor:not-allowed}
+button.ghost{padding:4px 9px;color:var(--muted)}
+ul{list-style:none;margin:14px 0 0;padding:0;display:grid;gap:8px}
+li.item{display:grid;grid-template-columns:auto 56px 1fr auto;gap:10px;align-items:center;border:1px solid var(--line);border-radius:8px;padding:8px;background:var(--card)}
+li.item.dragging{opacity:.4}
+.handle{color:var(--muted);cursor:grab;user-select:none;font-size:18px;padding:0 4px}
+.thumb{width:56px;height:56px;object-fit:contain;background:var(--soft);border-radius:4px}
+.meta{min-width:0}
+.name{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sub{color:var(--muted);font-size:13px}
+.ctrl{display:flex;align-items:center;gap:6px;flex-wrap:wrap;justify-content:flex-end}
+.ctrl label{font-size:13px;color:var(--muted)}
+input[type=number]{width:64px;font:inherit;padding:6px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--ink)}
+select{font:inherit;padding:7px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--ink)}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:14px}
+.field>span{display:block;font-size:13px;color:var(--muted);margin-bottom:4px}
+.seg{display:flex;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+.seg button{flex:1;border:0;border-radius:0;background:var(--card)}
+.seg button.on{background:var(--accent);color:var(--accent-ink)}
+.checks{display:grid;gap:8px;margin-top:14px}
+.checks label{display:flex;gap:8px;align-items:flex-start}
+.summary{display:flex;flex-wrap:wrap;gap:10px;margin-top:14px}
+.pill{background:var(--soft);border-radius:999px;padding:5px 12px;font-size:14px}
+.pill b{color:var(--accent)}
+.preview{display:flex;gap:14px;overflow-x:auto;padding:4px 2px 10px;margin-top:12px}
+.sheet{position:relative;flex:0 0 auto;height:260px;background:var(--sheet);border:1px solid var(--sheet-line);box-shadow:0 2px 6px rgba(0,0,0,.18)}
+.sheet img{position:absolute;object-fit:contain}
+.sheet .cut{position:absolute;border:0;border-top:1px dashed #8b9bb0}
+.sheet .n{position:absolute;right:4px;bottom:2px;font-size:10px;color:#6b7c92}
+.msg{margin-top:12px;padding:10px 12px;border-radius:8px;background:var(--soft);font-size:14px}
+.msg.err{color:var(--danger);border:1px solid var(--danger);background:transparent}
+.empty{color:var(--muted);text-align:center;padding:14px 0 2px}
+body.book .copies{display:none}
+body.book #per,body.book #orient,body.poster #per,body.poster #orient{opacity:.4;pointer-events:none}
+[hidden]{display:none!important}
+.drop.locked{opacity:.55}
+.legal details{margin-top:4px}
+.legal summary{cursor:pointer;color:var(--accent);font-weight:600}
+.legal .txt{max-height:280px;overflow:auto;border:1px solid var(--line);border-radius:8px;padding:10px 14px;margin:8px 0;font-size:13px;background:var(--bg)}
+.legal .txt h3{font-size:14px;margin:12px 0 4px}
+.legal .txt p{margin:4px 0}
+.legal label{display:flex;gap:8px;align-items:flex-start;margin:10px 0 14px;font-weight:600}
+mark{background:#ffe9a8;color:#3a2e00;padding:0 3px;border-radius:3px}
+@media (max-width:560px){li.item{grid-template-columns:auto 48px 1fr}.ctrl{grid-column:1/-1;justify-content:space-between}.thumb{width:48px;height:48px}}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header>
+  <h1>Armador de PDF para imprimir</h1>
+  <p>Subí tus archivos, elegí cuántos por hoja y cuántas copias. Todo se arma en tu navegador: nada se sube a ningún servidor.</p>
+</header>
+
+<section class="card">
+  <h2 class="step"><b>1</b>Subir archivos</h2>
+  <div class="legal">
+    <details><summary>Ver términos y condiciones y política de privacidad</summary>
+    <div class="txt">
+      <p><i>Última actualización: 28 de octubre de 2026.</i></p>
+      <h3>TÉRMINOS Y CONDICIONES DE USO</h3>
+      <p><b>1. Objeto.</b> Esta herramienta gratuita permite combinar archivos PDF, JPG y PNG en un único PDF listo para imprimir (varios diseños por hoja, libritos o pósters). Su uso implica la aceptación de estos términos.</p>
+      <p><b>2. Responsabilidad sobre los archivos.</b> Quien usa la herramienta declara ser titular de los archivos que sube o contar con autorización para reproducirlos, y asume la responsabilidad por su contenido, incluidos los derechos de autor, la propiedad intelectual, la imagen y los datos personales de terceros. Está prohibido subir contenido ilícito o que infrinja derechos de terceros.</p>
+      <p><b>3. Archivos admitidos y seguridad.</b> Solo se admiten PDF, JPG y PNG de hasta 50 MB cada uno. La herramienta verifica el contenido real de cada archivo, rechaza PDF con JavaScript, archivos adjuntos u otros elementos activos, y reconstruye las imágenes y el PDF de salida. Estas medidas reducen los riesgos pero <b>no constituyen un antivirus ni garantizan la ausencia total de contenido malicioso</b>. Se recomienda usar archivos de fuentes confiables y mantener el navegador y el sistema actualizados.</p>
+      <p><b>4. Resultado.</b> El PDF se genera y se descarga en el dispositivo de quien lo usa. Se recomienda revisar la vista previa y hacer una prueba de impresión. La herramienta no garantiza que el resultado coincida exactamente con la impresión real (escala, márgenes de la impresora, calidad de los archivos de origen).</p>
+      <p><b>5. Sin garantías y límite de responsabilidad.</b> La herramienta se ofrece “tal cual”, sin garantías de disponibilidad ni de ausencia de errores. En la medida permitida por la ley, y sin perjuicio de los derechos irrenunciables del usuario, el responsable no responde por costos de impresión, pérdida de archivos ni daños derivados del uso o de la imposibilidad de uso.</p>
+      <p><b>6. Propiedad intelectual.</b> La herramienta utiliza las bibliotecas de código abierto pdf-lib y pdf.js, sujetas a sus propias licencias.</p>
+      <p><b>7. Cambios, ley aplicable y contacto.</b> Estos términos pueden modificarse; la versión vigente es la publicada en esta página. Se rigen por las leyes de la República Argentina y será competente la jurisdicción que corresponda según la normativa aplicable.</p>
+      <h3>POLÍTICA DE PRIVACIDAD</h3>
+      <p><b>1. Responsable.</b> <mark>[COMPLETAR: nombre o razón social del responsable]</mark>. Contacto: <mark>[COMPLETAR: correo de contacto]</mark>.</p>
+      <p><b>2. Procesamiento local.</b> Los archivos se procesan exclusivamente en el navegador del usuario. No se envían, almacenan ni comparten con servidores del responsable ni de terceros. Esta página no crea cuentas ni bases de datos, no usa cookies ni almacenamiento local y no incluye analítica ni publicidad.</p>
+      <p><b>3. Eliminación de los archivos.</b> Los archivos subidos y sus vistas previas se eliminan de la memoria de la página en cuanto se genera el PDF, al tocar “Borrar todos los archivos ahora” y al cerrar o recargar la página. El PDF generado queda en el dispositivo del usuario (carpeta de descargas e historial del navegador), quien es responsable de resguardarlo o eliminarlo.</p>
+      <p><b>4. Datos técnicos.</b> La página se carga desde el servicio de alojamiento y descarga dos bibliotecas de código abierto (pdf-lib y pdf.js) desde cdnjs (Cloudflare). Esos proveedores pueden registrar datos técnicos habituales (dirección IP, navegador, fecha y hora) según sus propias políticas. Esos datos no incluyen el contenido de los archivos.</p>
+      <p><b>5. Datos personales en los archivos.</b> Si los archivos contienen datos personales de terceros, quien los sube debe contar con el consentimiento o la base legal que corresponda (Ley N° 25.326 de Protección de los Datos Personales de la República Argentina y normas concordantes). Las imágenes se reconstruyen al cargarlas, lo que elimina sus metadatos (por ejemplo, la ubicación GPS).</p>
+      <p><b>6. Derechos.</b> Como la herramienta no recolecta ni conserva datos personales, no hay datos sobre los que ejercer los derechos de acceso, rectificación y supresión. Para consultas, escribir al contacto indicado. La Agencia de Acceso a la Información Pública, en su carácter de Órgano de Control de la Ley N° 25.326, tiene la atribución de atender las denuncias y reclamos de quienes resulten afectados en sus derechos por el incumplimiento de las normas de protección de datos personales.</p>
+      <p><b>7. Menores y otros países.</b> La herramienta no está dirigida a menores de edad sin supervisión de un adulto responsable. Si se accede desde otro país, pueden aplicar normas locales de protección de datos.</p>
+    </div></details>
+    <label><input type="checkbox" id="acc"><span>Leí y acepto los términos y condiciones y la política de privacidad. Es obligatorio para poder subir archivos.</span></label>
+  </div>
+  <div class="drop" id="drop" tabindex="0"><strong>Arrastrá acá tus archivos</strong> o tocá para elegirlos<br><span class="sub">PDF, JPG o PNG. Cada página de un PDF cuenta como un ítem.</span></div>
+  <input type="file" id="file" multiple accept="application/pdf,image/jpeg,image/png" hidden>
+  <div id="msg"></div>
+  <ul id="list"></ul>
+  <div class="empty" id="empty">Todavía no subiste archivos.</div>
+</section>
+
+<section class="card">
+  <h2 class="step"><b>2</b>Configurar</h2>
+  <div class="grid">
+    <div class="field"><span>Tamaño de hoja</span>
+      <select id="size"><option value="A4">A4</option><option value="Carta">Carta</option><option value="Oficio">Oficio / Legal</option></select></div>
+    <div class="field"><span>Orientación</span>
+      <div class="seg" id="orient"><button data-v="v" class="on">Vertical</button><button data-v="h">Horizontal</button></div></div>
+    <div class="field"><span>Ítems por hoja</span>
+      <div class="seg" id="per"><button data-v="1" class="on">1</button><button data-v="2">2</button><button data-v="4">4</button><button data-v="8">8</button><button data-v="12">12</button><button data-v="16">16</button></div></div>
+    <div class="field"><span>Margen: <b id="mmv">8</b> mm</span>
+      <input type="range" id="mm" min="0" max="25" value="8" style="width:100%"></div>
+  </div>
+  <div class="checks">
+    <label><input type="checkbox" id="cut" checked><span>Mostrar líneas finas de corte entre ítems</span></label>
+    <label><input type="checkbox" id="nomix"><span>No mezclar ítems distintos en una misma hoja (si sobra un lugar, queda vacío)</span></label>
+    <label><input type="checkbox" id="book"><span><b>Armar como librito (folleto)</b></span></label>
+    <div class="field" id="bkbox" hidden><span>Cantidad de libritos</span><input type="number" id="bkn" min="1" max="999" value="1"></div>
+    <div class="msg" id="bknote" hidden>Cada ítem de la lista es una página del librito, en el orden en que aparecen (el campo de copias por ítem no se usa). Si la cantidad no es múltiplo de 4, se agregan páginas en blanco al final. Las hojas salen en apaisado, con 2 páginas por cara: imprimí a doble faz volteando por el borde corto, juntá las hojas, doblalas por la mitad y abrochalas en el pliegue.</div>
+    <label><input type="checkbox" id="poster"><span><b>Armar como póster</b> (un diseño repartido en varias hojas)</span></label>
+    <div class="grid" id="pbox" hidden>
+      <div class="field"><span>Hojas por póster</span><input type="number" id="pn" min="2" max="64" value="4"></div>
+      <div class="field"><span>Superposición (mm)</span><input type="number" id="ov" min="0" max="30" value="10"></div>
+    </div>
+    <div class="msg" id="pnote" hidden>Cada ítem de la lista se agranda y se reparte en la cantidad de hojas que elijas. La disposición (columnas × filas) y la orientación de la hoja se eligen solas para aprovechar mejor el espacio. La superposición es la franja que se repite entre hojas contiguas, para poder pegarlas. Cada hoja sale rotulada con fila y columna (F1-C1 es la de arriba a la izquierda) siempre que el margen sea de 5 mm o más. El campo de copias indica cuántos pósters completos se arman. Para pósters grandes conviene partir de un PDF o de una imagen de alta resolución.</div>
+  </div>
+  <div class="summary" id="summary"></div>
+  <div class="preview" id="preview"></div>
+</section>
+
+<section class="card">
+  <h2 class="step"><b>3</b>Descargar</h2>
+  <button class="primary" id="go" disabled>Generar PDF</button>
+  <button id="clr" style="margin-top:8px;width:100%">Borrar todos los archivos ahora</button>
+  <div id="gmsg"></div>
+</section>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script>
+(function(){
+const SIZES={A4:[595.28,841.89],Carta:[612,792],Oficio:[612,1008]};
+const MM=72/25.4, GAP=10;
+const st={size:'A4',orient:'v',per:1,mm:8,cut:true,nomix:false,book:false,bk:1,poster:false,pn:4,ov:10};
+let items=[],uid=0,dragId=null;
+const $=id=>document.getElementById(id);
+if(window.pdfjsLib){pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';}
+
+function showMsg(t,err){$('msg').innerHTML=t?'<div class="msg'+(err?' err':'')+'"></div>':'';if(t)$('msg').firstChild.textContent=t;}
+
+/* ---------- carga de archivos ---------- */
+async function addFilesCore(files){
+  showMsg('');const errors=[];
+  for(const f of files){
+    try{
+      const isPdf=f.type==='application/pdf'||/\.pdf$/i.test(f.name);
+      const isImg=/^image\/(jpeg|png)$/.test(f.type);
+      if(!isPdf&&!isImg){errors.push('“'+f.name+'” no es un formato admitido (usá PDF, JPG o PNG).');continue;}
+      const bytes=new Uint8Array(await f.arrayBuffer());
+      if(isImg){
+        const url=URL.createObjectURL(new Blob([bytes],{type:f.type}));
+        const dim=await new Promise((res,rej)=>{const im=new Image();im.onload=()=>res([im.naturalWidth,im.naturalHeight]);im.onerror=rej;im.src=url;});
+        items.push({id:++uid,name:f.name,kind:f.type==='image/png'?'png':'jpg',bytes,w:dim[0],h:dim[1],thumb:url,copies:1,page:0});
+      }else{
+        let doc;
+        try{doc=await pdfjsLib.getDocument({data:bytes.slice()}).promise;}
+        catch(e){errors.push(e&&e.name==='PasswordException'?'“'+f.name+'” está protegido con contraseña y no se puede leer.':'No se pudo leer “'+f.name+'”: el PDF parece dañado.');continue;}
+        const shared={bytes,doc};
+        for(let p=1;p<=doc.numPages;p++){
+          const page=await doc.getPage(p),vp=page.getViewport({scale:1});
+          const s=500/vp.width,v2=page.getViewport({scale:s});
+          const c=document.createElement('canvas');c.width=v2.width;c.height=v2.height;
+          await page.render({canvasContext:c.getContext('2d'),viewport:v2}).promise;
+          items.push({id:++uid,name:f.name,kind:'pdf',shared,w:vp.width,h:vp.height,thumb:c.toDataURL('image/jpeg',.8),copies:1,page:p-1,pages:doc.numPages});
+        }
+      }
+    }catch(e){errors.push('No se pudo procesar “'+f.name+'”.');}
+  }
+  if(errors.length)showMsg(errors.join(' '),true);
+  renderList();update();
+}
+
+/* ---------- validación, seguridad y borrado ---------- */
+const MAXF=50*1024*1024,MAXN=300,MAXPX=100e6;
+const FORBID=/\/(JavaScript|JS|Launch|RichMedia|EmbeddedFile|SubmitForm|ImportData|GoToR|GoToE)\b/;
+function sniff(b){
+  const eq=a=>a.every((v,i)=>b[i]===v);
+  if(eq([0xFF,0xD8,0xFF]))return 'jpg';
+  if(eq([0x89,0x50,0x4E,0x47,0x0D,0x0A,0x1A,0x0A]))return 'png';
+  if(eq([0x25,0x50,0x44,0x46,0x2D]))return 'pdf';
+  return null;
+}
+async function addFiles(files){
+  if(!st.ok){showMsg('Antes de subir archivos tenés que aceptar los términos y condiciones y la política de privacidad.',true);return;}
+  const ok=[],errs=[];
+  for(const f of files){
+    try{
+      if(f.size>MAXF){errs.push('“'+f.name+'” supera el máximo de 50 MB.');continue;}
+      if(items.length+ok.length>=MAXN){errs.push('Alcanzaste el máximo de '+MAXN+' ítems.');break;}
+      const bytes=new Uint8Array(await f.arrayBuffer()),k=sniff(bytes);
+      if(!k){errs.push('“'+f.name+'” fue rechazado: su contenido no corresponde a un PDF, JPG o PNG válido.');continue;}
+      if(k==='pdf'){
+        let doc;
+        try{doc=await pdfjsLib.getDocument({data:bytes.slice()}).promise;}
+        catch(e){errs.push(e&&e.name==='PasswordException'?'“'+f.name+'” está protegido con contraseña y no se puede leer.':'No se pudo leer “'+f.name+'”: el PDF parece dañado.');continue;}
+        let bad=null;
+        try{
+          const js=await doc.getJavaScript();if(js&&js.length)bad='contiene JavaScript';
+          const at=await doc.getAttachments();if(!bad&&at&&Object.keys(at).length)bad='contiene archivos adjuntos';
+        }catch(_){}
+        if(!bad&&FORBID.test(new TextDecoder('latin1').decode(bytes)))bad='contiene elementos activos o incrustados';
+        if(!bad&&items.length+ok.length+doc.numPages>MAXN)bad='tiene demasiadas páginas';
+        await doc.destroy();
+        if(bad){errs.push('“'+f.name+'” fue rechazado porque '+bad+'.');continue;}
+        ok.push(new File([bytes],f.name,{type:'application/pdf'}));
+      }else{
+        const mime=k==='png'?'image/png':'image/jpeg',u0=URL.createObjectURL(new Blob([bytes],{type:mime}));
+        let im;
+        try{im=await new Promise((res,rej)=>{const i=new Image();i.onload=()=>res(i);i.onerror=rej;i.src=u0;});}
+        catch(e){URL.revokeObjectURL(u0);errs.push('“'+f.name+'” no se pudo leer como imagen válida.');continue;}
+        const w=im.naturalWidth,h=im.naturalHeight;
+        if(!w||!h||w*h>MAXPX){URL.revokeObjectURL(u0);errs.push('“'+f.name+'” tiene una resolución demasiado alta (máximo 100 megapíxeles).');continue;}
+        const c=document.createElement('canvas');c.width=w;c.height=h;c.getContext('2d').drawImage(im,0,0);
+        URL.revokeObjectURL(u0);
+        const blob=await new Promise(r=>c.toBlob(r,mime,.95));c.width=c.height=0;
+        if(!blob){errs.push('No se pudo procesar “'+f.name+'”.');continue;}
+        ok.push(new File([blob],f.name,{type:mime}));
+      }
+    }catch(e){errs.push('No se pudo procesar “'+f.name+'”.');}
+  }
+  if(ok.length)await addFilesCore(ok);else showMsg('');
+  if(errs.length){const cur=$('msg').textContent;showMsg((cur?cur+' ':'')+errs.join(' '),true);}
+}
+function wipe(){
+  items.forEach(it=>{
+    try{if(it.bytes)it.bytes.fill(0);}catch(_){}
+    try{if(it.shared&&!it.shared.done){it.shared.done=true;it.shared.bytes.fill(0);it.shared.doc.destroy();}}catch(_){}
+    if(it.kind!=='pdf'&&it.thumb){try{URL.revokeObjectURL(it.thumb);}catch(_){}}
+  });
+  items=[];$('file').value='';
+  renderList();update();
+}
+
+/* ---------- lista ---------- */
+function renderList(){
+  const ul=$('list');ul.innerHTML='';
+  $('empty').style.display=items.length?'none':'block';
+  items.forEach((it,i)=>{
+    const li=document.createElement('li');li.className='item';li.draggable=true;li.dataset.id=it.id;
+    li.innerHTML='<span class="handle" title="Arrastrar para reordenar">⋮⋮</span><img class="thumb" alt=""><div class="meta"><div class="name"></div><div class="sub"></div></div><div class="ctrl"><label class="copies">Copias <input type="number" min="1" max="999" value="'+it.copies+'"></label><button class="ghost" data-a="up" title="Subir">↑</button><button class="ghost" data-a="down" title="Bajar">↓</button><button class="ghost" data-a="del" title="Eliminar">✕</button></div>';
+    li.querySelector('img').src=it.thumb;
+    li.querySelector('.name').textContent=it.name;
+    li.querySelector('.sub').textContent=it.kind==='pdf'?'Página '+(it.page+1)+' de '+it.pages:'Imagen '+it.kind.toUpperCase();
+    li.querySelector('input').addEventListener('input',e=>{it.copies=Math.max(1,Math.min(999,parseInt(e.target.value)||1));update();});
+    li.querySelector('input').addEventListener('blur',e=>{e.target.value=it.copies;});
+    li.addEventListener('click',e=>{
+      const a=e.target.dataset&&e.target.dataset.a;if(!a)return;
+      const k=items.indexOf(it);
+      if(a==='del')items.splice(k,1);
+      if(a==='up'&&k>0)[items[k-1],items[k]]=[items[k],items[k-1]];
+      if(a==='down'&&k<items.length-1)[items[k+1],items[k]]=[items[k],items[k+1]];
+      renderList();update();
+    });
+    li.addEventListener('dragstart',()=>{dragId=it.id;li.classList.add('dragging');});
+    li.addEventListener('dragend',()=>{li.classList.remove('dragging');});
+    li.addEventListener('dragover',e=>{if(dragId!==null)e.preventDefault();});
+    li.addEventListener('drop',e=>{
+      e.preventDefault();if(dragId===null||dragId===it.id)return;
+      const from=items.findIndex(x=>x.id===dragId),to=items.indexOf(it);
+      const [m]=items.splice(from,1);items.splice(to,0,m);dragId=null;renderList();update();
+    });
+    ul.appendChild(li);
+  });
+}
+
+/* ---------- maquetación ---------- */
+function geom(){
+  let [W,H]=SIZES[st.size];if(st.orient==='h'||st.book)[W,H]=[H,W];
+  const m=st.mm*MM;
+  const LAY={1:[1,1],2:[1,2],4:[2,2],8:[2,4],12:[3,4],16:[4,4]};
+  let [cols,rows]=LAY[st.per];
+  if(st.book)[cols,rows]=[2,1];else if(st.orient==='h')[cols,rows]=[rows,cols];
+  const cw=(W-2*m-GAP*(cols-1))/cols,ch=(H-2*m-GAP*(rows-1))/rows,cells=[];
+  for(let r=0;r<rows;r++)for(let c=0;c<cols;c++)cells.push({x:m+c*(cw+GAP),y:m+r*(ch+GAP),w:cw,h:ch});
+  return {W,H,m,cols,rows,cw,ch,cells};
+}
+function slots(){
+  if(st.book){
+    const pgs=items.slice();while(pgs.length%4)pgs.push(null);
+    const N=pgs.length,one=[];
+    for(let s=0;s<N/4;s++){one.push([pgs[N-1-2*s],pgs[2*s]]);one.push([pgs[2*s+1],pgs[N-2-2*s]]);}
+    const sheets=[];for(let c=0;c<st.bk;c++)one.forEach(x=>sheets.push(x.slice()));
+    return {sheets,total:items.length?st.bk:0,slots:sheets.flat()};
+  }
+  const n=st.per,out=[];
+  items.forEach(it=>{
+    for(let k=0;k<it.copies;k++)out.push(it);
+    if(st.nomix)while(out.length%n)out.push(null);
+  });
+  const sheets=[];for(let i=0;i<out.length;i+=n)sheets.push(out.slice(i,i+n));
+  return {sheets,total:items.reduce((a,b)=>a+b.copies,0),slots:out};
+}
+function fit(it,c){const s=Math.min(c.w/it.w,c.h/it.h),w=it.w*s,h=it.h*s;return {x:c.x+(c.w-w)/2,y:c.y+(c.h-h)/2,w,h};}
+
+/* ---------- resumen y vista previa ---------- */
+function update(){
+  const g=geom(),s=slots(),pv=$('preview'),sm=$('summary');
+  $('go').disabled=!items.length;
+  if(!items.length){sm.innerHTML='';pv.innerHTML='';return;}
+  if(st.poster){posterUI(pv,sm);return;}
+  const empty=s.sheets.length*(st.book?2:st.per)-s.slots.filter(Boolean).length;
+  sm.innerHTML='<span class="pill">Copias totales: <b>'+s.total+'</b></span><span class="pill">Hojas: <b>'+(st.book?s.sheets.length/2:s.sheets.length)+'</b></span><span class="pill">Lugares vacíos: <b>'+empty+'</b></span>';
+  pv.innerHTML='';
+  const show=s.sheets.slice(0,8),ph=260,pw=ph*g.W/g.H;
+  show.forEach((sh,i)=>{
+    const d=document.createElement('div');d.className='sheet';d.style.width=pw+'px';
+    const pct=(v,t)=>(v/t*100)+'%';
+    sh.forEach((it,k)=>{
+      if(!it)return;const f=fit(it,g.cells[k]),im=document.createElement('img');
+      im.src=it.thumb;im.alt='';
+      Object.assign(im.style,{left:pct(f.x,g.W),top:pct(f.y,g.H),width:pct(f.w,g.W),height:pct(f.h,g.H)});
+      d.appendChild(im);
+    });
+    if(st.cut&&!st.book&&st.per>1)cutLines(g).forEach(l=>{
+      const e=document.createElement('div');e.className='cut';
+      if(l.v){Object.assign(e.style,{left:pct(l.x1,g.W),top:pct(l.y1,g.H),height:pct(l.y2-l.y1,g.H),borderTop:'0',borderLeft:'1px dashed #8b9bb0'});}
+      else Object.assign(e.style,{left:pct(l.x1,g.W),top:pct(l.y1,g.H),width:pct(l.x2-l.x1,g.W)});
+      d.appendChild(e);
+    });
+    const n=document.createElement('span');n.className='n';n.textContent=st.book?(i%2?'dorso':'frente'):(i+1);d.appendChild(n);
+    pv.appendChild(d);
+  });
+  if(s.sheets.length>show.length){const t=document.createElement('div');t.className='sub';t.style.alignSelf='center';t.textContent='… y '+(s.sheets.length-show.length)+' hojas más';pv.appendChild(t);}
+}
+function cutLines(g){
+  const L=[],c=g.cells;
+  for(let i=1;i<g.cols;i++){const x=g.m+i*g.cw+(i-1)*GAP+GAP/2;L.push({v:true,x1:x,x2:x,y1:g.m,y2:g.H-g.m});}
+  for(let i=1;i<g.rows;i++){const y=g.m+i*g.ch+(i-1)*GAP+GAP/2;L.push({v:false,x1:g.m,x2:g.W-g.m,y1:y,y2:y});}
+  return L;
+}
+
+/* ---------- póster ---------- */
+function posterPlan(it){
+  const [sw,sh]=SIZES[st.size],m=st.mm*MM,ov=st.ov*MM,N=st.pn,best={s:0};
+  for(const land of [false,true]){
+    const W=land?sh:sw,H=land?sw:sh,pw=W-2*m,ph=H-2*m;
+    for(let c=1;c<=N;c++){
+      if(N%c)continue;const r=N/c;
+      const TW=c*pw-(c-1)*ov,TH=r*ph-(r-1)*ov,s=Math.min(TW/it.w,TH/it.h);
+      if(s>best.s)Object.assign(best,{s,W,H,pw,ph,c,r,TW,TH,m,ov});
+    }
+  }
+  best.iw=it.w*best.s;best.ih=it.h*best.s;best.ox=(best.TW-best.iw)/2;best.oy=(best.TH-best.ih)/2;
+  return best;
+}
+function posterTiles(){
+  const T=[];
+  items.forEach(it=>{const p=posterPlan(it);
+    for(let k=0;k<it.copies;k++)for(let j=0;j<p.r;j++)for(let i=0;i<p.c;i++)T.push({it,p,i,j});});
+  return T;
+}
+function posterUI(pv,sm){
+  const T=posterTiles(),np=items.reduce((a,b)=>a+b.copies,0),p0=posterPlan(items[0]);
+  const cm=v=>Math.round(v/72*2.54),pct=(v,t)=>(v/t*100)+'%';
+  sm.innerHTML='<span class="pill">Pósters: <b>'+np+'</b></span><span class="pill">Hojas: <b>'+T.length+'</b></span>'+(items.length===1?'<span class="pill">Disposición: <b>'+p0.c+' × '+p0.r+'</b> (columnas × filas)</span><span class="pill">Tamaño: <b>'+cm(p0.iw)+' × '+cm(p0.ih)+' cm</b></span>':'<span class="pill">Disposición automática por ítem</span>');
+  pv.innerHTML='';
+  T.slice(0,16).forEach(t=>{
+    const p=t.p,d=document.createElement('div'),c=document.createElement('div'),im=document.createElement('img');
+    d.className='sheet';d.style.width=(260*p.W/p.H)+'px';
+    Object.assign(c.style,{position:'absolute',overflow:'hidden',left:pct(p.m,p.W),top:pct(p.m,p.H),width:pct(p.pw,p.W),height:pct(p.ph,p.H),outline:'1px dashed #b9c8da'});
+    im.src=t.it.thumb;im.alt='';
+    Object.assign(im.style,{left:pct(p.ox-t.i*(p.pw-p.ov),p.pw),top:pct(p.oy-t.j*(p.ph-p.ov),p.ph),width:pct(p.iw,p.pw),height:pct(p.ih,p.ph)});
+    c.appendChild(im);d.appendChild(c);
+    const n=document.createElement('span');n.className='n';n.textContent='F'+(t.j+1)+'-C'+(t.i+1);d.appendChild(n);
+    pv.appendChild(d);
+  });
+  if(T.length>16){const t=document.createElement('div');t.className='sub';t.style.alignSelf='center';t.textContent='… y '+(T.length-16)+' hojas más';pv.appendChild(t);}
+}
+
+/* ---------- generar PDF ---------- */
+async function build(){
+  const {PDFDocument,rgb}=PDFLib,g=geom(),s=slots(),out=await PDFDocument.create();
+  const emb=new Map(),srcCache=new Map();
+  async function embed(it){
+    if(emb.has(it.id))return emb.get(it.id);
+    let e;
+    if(it.kind==='pdf'){
+      try{
+        let src=srcCache.get(it.shared);
+        if(!src){src=await PDFDocument.load(it.shared.bytes,{ignoreEncryption:true});srcCache.set(it.shared,src);}
+        [e]=await out.embedPdf(src,[it.page]);
+      }catch(err){
+        console.warn('Insertando como imagen:',err);
+        const pg=await it.shared.doc.getPage(it.page+1),v=pg.getViewport({scale:3});
+        const c=document.createElement('canvas');c.width=v.width;c.height=v.height;
+        await pg.render({canvasContext:c.getContext('2d'),viewport:v}).promise;
+        const blob=await new Promise(r=>c.toBlob(r,'image/jpeg',.92));
+        e=await out.embedJpg(new Uint8Array(await blob.arrayBuffer()));
+      }
+    }else e=it.kind==='png'?await out.embedPng(it.bytes):await out.embedJpg(it.bytes);
+    emb.set(it.id,e);return e;
+  }
+  if(st.poster){
+    const font=await out.embedFont(PDFLib.StandardFonts.Helvetica),{pushGraphicsState,popGraphicsState,moveTo,lineTo,closePath,clip,endPath}=PDFLib;
+    for(const t of posterTiles()){
+      const p=t.p,pg=out.addPage([p.W,p.H]),e=await embed(t.it);
+      const x=p.m+p.ox-t.i*(p.pw-p.ov),yTop=p.m+p.oy-t.j*(p.ph-p.ov),y=p.H-yTop-p.ih;
+      let ok=false;
+      try{pg.pushOperators(pushGraphicsState(),moveTo(p.m,p.m),lineTo(p.m+p.pw,p.m),lineTo(p.m+p.pw,p.m+p.ph),lineTo(p.m,p.m+p.ph),closePath(),clip(),endPath());ok=true;}catch(_){}
+      if(t.it.kind==='pdf')pg.drawPage(e,{x,y,width:p.iw,height:p.ih});else pg.drawImage(e,{x,y,width:p.iw,height:p.ih});
+      if(ok)pg.pushOperators(popGraphicsState());
+      if(p.m>=14)pg.drawText('F'+(t.j+1)+'-C'+(t.i+1),{x:p.m,y:4,size:7,font,color:rgb(.4,.45,.55)});
+    }
+    return out.save();
+  }
+  for(const sh of s.sheets){
+    const pg=out.addPage([g.W,g.H]);
+    for(let k=0;k<sh.length;k++){
+      const it=sh[k];if(!it)continue;
+      const e=await embed(it),f=fit(it,g.cells[k]),y=g.H-f.y-f.h;
+      if(it.kind==='pdf')pg.drawPage(e,{x:f.x,y,width:f.w,height:f.h});
+      else pg.drawImage(e,{x:f.x,y,width:f.w,height:f.h});
+    }
+    if(st.cut&&!st.book&&st.per>1)cutLines(g).forEach(l=>pg.drawLine({start:{x:l.x1,y:g.H-l.y1},end:{x:l.x2,y:g.H-l.y2},thickness:.5,color:rgb(.55,.6,.68),dashArray:[4,3]}));
+  }
+  return out.save();
+}
+$('go').addEventListener('click',async()=>{
+  const b=$('go'),gm=$('gmsg');b.disabled=true;b.textContent='Generando…';gm.innerHTML='';
+  const say=(t,err)=>{gm.innerHTML='<div class="msg'+(err?' err':'')+'"></div>';gm.firstChild.textContent=t;};
+  try{
+    const data=await build();
+    let saved=false;
+    try{
+      const dl=window.claude&&await claude.use('downloads');
+      if(dl){await dl.save({filename:'para-imprimir.pdf',data:new Blob([data],{type:'application/pdf'})});saved=true;}
+    }catch(e){if(e&&e.code==='declined'){say('Descarga cancelada. Podés volver a intentarlo cuando quieras.');return;}}
+    if(!saved){
+      const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([data],{type:'application/pdf'}));a.download='para-imprimir.pdf';
+      document.body.appendChild(a);a.click();a.remove();
+    }
+    say(st.poster?'Listo: “para-imprimir.pdf” con '+posterTiles().length+' hojas para armar el póster. Imprimilo al 100 % de escala, recortá si hace falta y pegá las hojas usando la franja de superposición. Cada hoja está rotulada con fila y columna (F1-C1 es la de arriba a la izquierda).':st.book?'Listo: “para-imprimir.pdf” armado como librito ('+slots().sheets.length/2+' hojas por todos los libritos). Imprimilo a doble faz volteando por el borde corto, juntá las hojas, doblalas por la mitad y abrochalas en el pliegue.':'Listo: “para-imprimir.pdf” con '+slots().sheets.length+' hojas. Mandalo a imprimir al 100 % de escala (sin “ajustar a la página”).');
+  wipe();data.fill(0);gm.firstChild.textContent+=' Por privacidad, los archivos que subiste ya se borraron de esta página (para armar otro PDF, tenés que volver a subirlos).';
+  }catch(e){console.error(e);say('No se pudo generar el PDF. Detalle del error: '+((e&&e.message)||e)+'. Probá quitar el archivo que dé problemas y volver a intentar.',true);}
+  finally{b.disabled=!items.length;b.textContent='Generar PDF';}
+});
+
+/* ---------- controles ---------- */
+const drop=$('drop'),fi=$('file');
+drop.addEventListener('click',()=>fi.click());
+drop.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();fi.click();}});
+fi.addEventListener('change',()=>{addFiles([...fi.files]);fi.value='';});
+['dragenter','dragover'].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.add('over');}));
+['dragleave','drop'].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.remove('over');}));
+drop.addEventListener('drop',e=>{if(e.dataTransfer&&e.dataTransfer.files.length)addFiles([...e.dataTransfer.files]);});
+function seg(id,key,num){$(id).addEventListener('click',e=>{const v=e.target.dataset&&e.target.dataset.v;if(!v)return;
+  st[key]=num?+v:v;[...$(id).children].forEach(b=>b.classList.toggle('on',b===e.target));update();});}
+seg('orient','orient');seg('per','per',true);
+$('size').addEventListener('change',e=>{st.size=e.target.value;update();});
+$('mm').addEventListener('input',e=>{st.mm=+e.target.value;$('mmv').textContent=st.mm;update();});
+$('cut').addEventListener('change',e=>{st.cut=e.target.checked;update();});
+$('nomix').addEventListener('change',e=>{st.nomix=e.target.checked;update();});
+function mode(m){
+  st.book=m==='book';st.poster=m==='poster';
+  $('book').checked=st.book;$('poster').checked=st.poster;
+  document.body.classList.toggle('book',st.book);document.body.classList.toggle('poster',st.poster);
+  $('bkbox').hidden=$('bknote').hidden=!st.book;$('pbox').hidden=$('pnote').hidden=!st.poster;
+  update();
+}
+$('book').addEventListener('change',e=>mode(e.target.checked?'book':''));
+$('poster').addEventListener('change',e=>mode(e.target.checked?'poster':''));
+$('pn').addEventListener('input',e=>{st.pn=Math.max(2,Math.min(64,parseInt(e.target.value)||2));update();});
+$('ov').addEventListener('input',e=>{st.ov=Math.max(0,Math.min(30,parseFloat(e.target.value)||0));update();});
+st.ok=false;$('file').disabled=true;$('drop').classList.add('locked');
+$('acc').addEventListener('change',e=>{st.ok=e.target.checked;$('file').disabled=!st.ok;$('drop').classList.toggle('locked',!st.ok);if(st.ok)showMsg('');});
+$('drop').addEventListener('click',()=>{if(!st.ok)showMsg('Antes de subir archivos tenés que aceptar los términos y condiciones y la política de privacidad.',true);});
+$('clr').addEventListener('click',()=>{wipe();showMsg('Se borraron todos los archivos de esta página.');});
+window.addEventListener('pagehide',wipe);
+$('bkn').addEventListener('input',e=>{st.bk=Math.max(1,Math.min(999,parseInt(e.target.value)||1));update();});
+renderList();update();
+})();
+</script>
+</body>
+</html>
